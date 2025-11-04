@@ -1,2 +1,3 @@
-# MAGI-Core
-Vibe Coded MCP server with extensible connections. 
+# MCP Local Tasks Starter
+
+Project starter folder.
