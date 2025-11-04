@@ -64,6 +64,28 @@ CREATE TABLE IF NOT EXISTS calendars (
   created_ts TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS jira_issues (
+  id TEXT PRIMARY KEY,
+  key TEXT NOT NULL UNIQUE,
+  summary TEXT NOT NULL,
+  description TEXT,
+  status TEXT NOT NULL,
+  priority TEXT,
+  assignee TEXT,
+  assignee_display_name TEXT,
+  reporter TEXT,
+  reporter_display_name TEXT,
+  created TEXT NOT NULL,
+  updated TEXT NOT NULL,
+  due_date TEXT,
+  issue_type TEXT NOT NULL,
+  project_key TEXT NOT NULL,
+  project_name TEXT NOT NULL,
+  web_url TEXT NOT NULL,
+  labels TEXT,
+  created_ts TEXT NOT NULL
+);
+
 -- FTS5 virtual table for keyword search
 CREATE VIRTUAL TABLE IF NOT EXISTS tasks_fts USING fts5(title, body, summary, content='tasks', content_rowid='rowid');
 
@@ -100,3 +122,10 @@ CREATE INDEX IF NOT EXISTS idx_outlook_folder ON outlook_messages (folder, recei
 
 CREATE INDEX IF NOT EXISTS idx_calendars_start ON calendars (start ASC);
 CREATE INDEX IF NOT EXISTS idx_calendars_range ON calendars (start ASC, end ASC);
+
+CREATE INDEX IF NOT EXISTS idx_jira_key ON jira_issues (key);
+CREATE INDEX IF NOT EXISTS idx_jira_assignee ON jira_issues (assignee);
+CREATE INDEX IF NOT EXISTS idx_jira_status ON jira_issues (status);
+CREATE INDEX IF NOT EXISTS idx_jira_project ON jira_issues (project_key);
+CREATE INDEX IF NOT EXISTS idx_jira_updated ON jira_issues (updated DESC);
+CREATE INDEX IF NOT EXISTS idx_jira_recent ON jira_issues (created_ts DESC);

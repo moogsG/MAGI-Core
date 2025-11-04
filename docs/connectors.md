@@ -1,6 +1,6 @@
 # Connectors Guide
 
-Connection helpers integrate external data sources (Slack, Microsoft 365, etc.) with MAGI-Core.
+Connection helpers integrate external data sources (Slack, Microsoft 365, Jira, etc.) with MAGI-Core.
 
 ## Overview
 
@@ -490,6 +490,213 @@ CREATE TABLE calendars (
 - Email/calendar data stored in local SQLite
 - No data sent to third parties
 - Configure `mail_folders` to limit data ingestion
+
+## Jira Connector
+
+### Features
+
+- Automatic polling of issues assigned to you (2-15 min intervals)
+- Project-based filtering
+- Status-based filtering
+- Add comments to issues
+- Transition issues between statuses
+- Local SQLite storage for fast access
+
+### Required Credentials
+
+Your Jira Cloud account needs:
+- **API Token** - Generate at https://id.atlassian.com/manage-profile/security/api-tokens
+- **Account ID** - Your Jira user account ID
+- **Email** - Your Jira account email
+
+### Setup Steps
+
+1. **Generate API Token**
+   - Go to https://id.atlassian.com/manage-profile/security/api-tokens
+   - Click **Create API token**
+   - Give it a label (e.g., "MAGI-Core")
+   - Copy the token
+
+2. **Find Your Account ID**
+   - Go to your Jira profile: `https://your-domain.atlassian.net/jira/people`
+   - Look at the URL for your account ID
+   - Or use API: `curl -u email:token https://your-domain.atlassian.net/rest/api/3/myself`
+
+### Configuration
+
+Add to `.env`:
+
+```bash
+JIRA_URL=https://your-domain.atlassian.net
+JIRA_EMAIL=your-email@example.com
+JIRA_API_TOKEN=your-api-token-here
+JIRA_USER_ACCOUNT_ID=your-account-id-here
+JIRA_POLL_MINUTES=5
+```
+
+Add to `config.json`:
+
+```json
+{
+  "helpers": [
+    {
+      "name": "jira",
+      "module": "./packages/connectors/jira/dist/index.js",
+      "config": {
+        "poll_minutes": 5,
+        "project_keys": ["PROJ", "TEAM"]
+      }
+    }
+  ]
+}
+```
+
+**Configuration Options:**
+- `poll_minutes` (optional): Polling interval (default: 5, range: 2-15)
+- `project_keys` (optional): Filter by project keys (e.g., `["PROJ", "TEAM"]`)
+
+### MCP Tools
+
+#### jira.list_issues
+
+List Jira issues assigned to you.
+
+**Parameters:**
+- `status` (array, optional): Filter by status
+- `project_keys` (array, optional): Filter by projects
+- `limit` (number, optional): Max issues (default: 50, max: 100)
+
+**Returns:**
+```json
+{
+  "as_of": "2025-11-04T12:00:00Z",
+  "source": "jira",
+  "count": 5,
+  "items": [
+    {
+      "id": "10001",
+      "key": "PROJ-123",
+      "summary": "Implement new feature",
+      "status": "In Progress",
+      "priority": "High",
+      "assignee": "John Doe",
+      "issue_type": "Task",
+      "project_key": "PROJ",
+      "updated": "2025-11-04T11:30:00Z",
+      "link": "https://your-domain.atlassian.net/browse/PROJ-123"
+    }
+  ]
+}
+```
+
+#### jira.get_issue
+
+Get full details of a specific issue.
+
+**Parameters:**
+- `issue_key` (string, required): Issue key (e.g., "PROJ-123")
+
+**Returns:**
+```json
+{
+  "issue": {
+    "id": "10001",
+    "key": "PROJ-123",
+    "summary": "Implement new feature",
+    "description": "Full description...",
+    "status": "In Progress",
+    "priority": "High",
+    "labels": ["backend", "api"]
+  }
+}
+```
+
+#### jira.add_comment
+
+Add a comment to an issue.
+
+**Parameters:**
+- `issue_key` (string, required): Issue key
+- `comment` (string, required): Comment text
+
+**Returns:**
+```json
+{
+  "ok": true,
+  "message": "Comment added to PROJ-123"
+}
+```
+
+#### jira.get_transitions
+
+Get available status transitions.
+
+**Parameters:**
+- `issue_key` (string, required): Issue key
+
+**Returns:**
+```json
+{
+  "transitions": [
+    { "id": "21", "name": "Done", "to": "Done" }
+  ]
+}
+```
+
+#### jira.transition_issue
+
+Transition issue to new status.
+
+**Parameters:**
+- `issue_key` (string, required): Issue key
+- `transition_id` (string, required): Transition ID
+
+**Returns:**
+```json
+{
+  "ok": true,
+  "message": "Issue PROJ-123 transitioned successfully",
+  "new_status": "Done"
+}
+```
+
+### Database Schema
+
+```sql
+CREATE TABLE jira_issues (
+  id TEXT PRIMARY KEY,
+  key TEXT NOT NULL UNIQUE,
+  summary TEXT NOT NULL,
+  description TEXT,
+  status TEXT NOT NULL,
+  priority TEXT,
+  assignee TEXT,
+  assignee_display_name TEXT,
+  reporter TEXT,
+  reporter_display_name TEXT,
+  created TEXT NOT NULL,
+  updated TEXT NOT NULL,
+  due_date TEXT,
+  issue_type TEXT NOT NULL,
+  project_key TEXT NOT NULL,
+  project_name TEXT NOT NULL,
+  web_url TEXT NOT NULL,
+  labels TEXT,
+  created_ts TEXT NOT NULL
+);
+
+CREATE INDEX idx_jira_assignee ON jira_issues (assignee);
+CREATE INDEX idx_jira_status ON jira_issues (status);
+CREATE INDEX idx_jira_project ON jira_issues (project_key);
+CREATE INDEX idx_jira_updated ON jira_issues (updated DESC);
+```
+
+### Privacy
+
+- API token stored in `.env` (not tracked by git)
+- Issue data stored locally in SQLite
+- No data sent to third parties
+- Only issues assigned to you are synced
 
 ## Creating Custom Connectors
 

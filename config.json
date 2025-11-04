@@ -9,6 +9,14 @@
       "name": "slack",
       "module": "./packages/connectors/slack/dist/index.js",
       "config": {}
+    },
+    {
+      "name": "jira",
+      "module": "./packages/connectors/jira/dist/index.js",
+      "config": {
+        "poll_minutes": 5,
+        "project_keys": ["GDEV"]
+      }
     }
   ]
 }

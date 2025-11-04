@@ -41,6 +41,21 @@
         "@types/node": "^20.0.0",
       },
     },
+    "packages/connectors/jira": {
+      "name": "@mcp/connector-jira",
+      "version": "0.1.0",
+      "dependencies": {
+        "dotenv": "^17.2.3",
+      },
+      "devDependencies": {
+        "@types/node": "^22.7.5",
+        "typescript": "^5.6.3",
+        "vitest": "^2.1.3",
+      },
+      "peerDependencies": {
+        "@modelcontextprotocol/sdk": "^1.0.0",
+      },
+    },
     "packages/connectors/ms": {
       "name": "@mcp/connector-ms",
       "version": "0.1.0",
@@ -205,6 +220,8 @@
     "@mcp/bench": ["@mcp/bench@workspace:packages/bench"],
 
     "@mcp/cli": ["@mcp/cli@workspace:packages/cli"],
+
+    "@mcp/connector-jira": ["@mcp/connector-jira@workspace:packages/connectors/jira"],
 
     "@mcp/connector-ms": ["@mcp/connector-ms@workspace:packages/connectors/ms"],
 
@@ -1081,6 +1098,8 @@
     "@azure/msal-node/uuid": ["uuid@8.3.2", "", { "bin": { "uuid": "dist/bin/uuid" } }, "sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg=="],
 
     "@mcp/cli/@types/node": ["@types/node@20.19.24", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-FE5u0ezmi6y9OZEzlJfg37mqqf6ZDSF2V/NLjUyGrR9uTZ7Sb9F7bLNZ03S4XVUNRWGA7Ck4c1kK+YnuWjl+DA=="],
+
+    "@mcp/connector-jira/dotenv": ["dotenv@17.2.3", "", {}, "sha512-JVUnt+DUIzu87TABbhPmNfVdBDt18BLOWjMUFJMSi/Qqg7NTYtabbvSNJGOJ7afbRuv9D/lngizHtP7QyLQ+9w=="],
 
     "@mcp/connector-slack/dotenv": ["dotenv@17.2.3", "", {}, "sha512-JVUnt+DUIzu87TABbhPmNfVdBDt18BLOWjMUFJMSi/Qqg7NTYtabbvSNJGOJ7afbRuv9D/lngizHtP7QyLQ+9w=="],
 
