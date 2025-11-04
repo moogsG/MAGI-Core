@@ -1,0 +1,82 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`task export formatTaskMarkdown matches snapshot for complete task 1`] = `
+"### Snapshot Test Task
+
+- **ID:** \`t_snapshot\`
+- **State:** 🔄 open
+- **Priority:** 🔴 high
+- **Due:** Dec 1, 2024
+- **Source:** github
+- **Created:** Nov 1, 2024 at 12:00 PM
+
+**Context:**
+
+This task is used for snapshot testing to ensure consistent markdown formatting.
+
+**💡 Suggested Prompts:**
+
+- 🔍 Investigate: Find likely root causes and quick diagnostics for "Snapshot Test Task".
+- 📝 Summarize: Summarize prior context and links for "Snapshot Test Task" in 5 bullets.
+- 📋 Plan: Propose a step-by-step plan to complete "Snapshot Test Task".
+- 🧪 Test: List test cases and edge conditions for "Snapshot Test Task".
+
+---
+"
+`;
+
+exports[`task export formatMarkdownDocument matches snapshot for grouped document 1`] = `
+"# Tasks Export
+
+*Generated: [TIMESTAMP]*
+
+---
+
+## High Priority
+
+*[N] tasks*
+
+### Implement markdown export
+
+- **ID:** \`t_[ID]\`
+- **State:** [STATE]
+- **Priority:** 🔴 high
+- **Due:** Nov 5, 2024
+- **Source:** github
+- **Created:** [DATE]
+
+**Context:**
+
+Add export functionality with grouping and prompt templates
+
+**💡 Suggested Prompts:**
+
+- 🔍 Investigate: Find likely root causes and quick diagnostics for "Implement markdown export".
+- 📝 Summarize: Summarize prior context and links for "Implement markdown export" in 5 bullets.
+- 📋 Plan: Propose a step-by-step plan to complete "Implement markdown export".
+- 🧪 Test: List test cases and edge conditions for "Implement markdown export".
+
+---
+
+### Write unit tests
+
+- **ID:** \`t_[ID]\`
+- **State:** [STATE]
+- **Priority:** 🔴 high
+- **Source:** local
+- **Created:** [DATE]
+
+**Context:**
+
+Add comprehensive test coverage including snapshots
+
+**💡 Suggested Prompts:**
+
+- 🔍 Investigate: Find likely root causes and quick diagnostics for "Write unit tests".
+- 📝 Summarize: Summarize prior context and links for "Write unit tests" in 5 bullets.
+- 📋 Plan: Propose a step-by-step plan to complete "Write unit tests".
+- 🧪 Test: List test cases and edge conditions for "Write unit tests".
+
+---
+"
+`;

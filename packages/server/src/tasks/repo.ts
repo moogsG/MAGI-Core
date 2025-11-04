@@ -1,6 +1,14 @@
 import { randomUUID } from "crypto";
+import { writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import type { DB } from "../db/index.js";
 import type { Task, TaskHandle, TaskPriority, TaskState } from "./types.js";
+import type { ExportMarkdownOptions } from "./export.types.js";
+import { 
+  fetchTasksForExport, 
+  groupTasks, 
+  formatMarkdownDocument 
+} from "./export.js";
 
 function nowISO() { return new Date().toISOString(); }
 
@@ -101,4 +109,38 @@ export function updateTask(db: DB, id: string, patch: Partial<Omit<Task, "id" | 
   // FTS is refreshed automatically via triggers
 
   return { ok: true as const };
+}
+
+export function exportMarkdown(db: DB, options: ExportMarkdownOptions = {}): { 
+  ok: true; 
+  path: string; 
+  taskCount: number; 
+  groupCount: number;
+} {
+  const {
+    path = process.env.MARKDOWN_PATH || "./tasks.md",
+    groupBy = "day",
+    includePrompts = true,
+    filter
+  } = options;
+
+  // Fetch tasks from database
+  const tasks = fetchTasksForExport(db, filter);
+
+  // Group tasks
+  const groupedTasks = groupTasks(tasks, groupBy);
+
+  // Format as markdown
+  const markdown = formatMarkdownDocument(groupedTasks, includePrompts);
+
+  // Write to file
+  const resolvedPath = resolve(path);
+  writeFileSync(resolvedPath, markdown, "utf-8");
+
+  return {
+    ok: true,
+    path: resolvedPath,
+    taskCount: tasks.length,
+    groupCount: groupedTasks.length
+  };
 }
