@@ -8,113 +8,139 @@ import {
 import type { DB } from "./db/index.js";
 import { createTask, expandTask, listTaskHandles, updateTask } from "./tasks/repo.js";
 import { queryHybrid } from "./tasks/hybrid.js";
+import type { ToolDefinition } from "./connections/types.js";
 
-export function buildServer(db: DB) {
+export function buildServer(db: DB, helperTools: ToolDefinition[] = []) {
   const server = new Server(
     { name: "mcp-local-tasks", version: "0.1.0" },
     { capabilities: { tools: {} } }
   );
 
-  // List available tools
-  server.setRequestHandler(ListToolsRequestSchema, async () => {
-    return {
-      tools: [
-        {
-          name: "task.create",
-          description: "Create a local task",
-          inputSchema: {
+  // Build core task tools
+  const coreTools = [
+    {
+      name: "task.create",
+      description: "Create a local task",
+      inputSchema: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          body: { type: "string" },
+          priority: { type: "string", enum: ["low", "med", "high"] },
+          due_ts: { type: "string" },
+          source: { type: "string" }
+        },
+        required: ["title"]
+      }
+    },
+    {
+      name: "task.list",
+      description: "List tasks as compact handles",
+      inputSchema: {
+        type: "object",
+        properties: {
+          filter: {
+            type: "object",
+            properties: {
+              state: { type: "array", items: { type: "string", enum: ["inbox", "open", "done"] } },
+              priority: { type: "array", items: { type: "string", enum: ["low", "med", "high"] } },
+              q: { type: "string" }
+            }
+          },
+          limit: { type: "number", minimum: 1, maximum: 100 }
+        }
+      }
+    },
+    {
+      name: "task.expand",
+      description: "Return full task",
+      inputSchema: {
+        type: "object",
+        properties: {
+          id: { type: "string" }
+        },
+        required: ["id"]
+      }
+    },
+    {
+      name: "task.update",
+      description: "Patch fields on a task",
+      inputSchema: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          patch: {
             type: "object",
             properties: {
               title: { type: "string" },
-              body: { type: "string" },
+              body: { type: ["string", "null"] },
+              state: { type: "string", enum: ["inbox", "open", "done"] },
               priority: { type: "string", enum: ["low", "med", "high"] },
-              due_ts: { type: "string" },
-              source: { type: "string" }
-            },
-            required: ["title"]
-          }
-        },
-        {
-          name: "task.list",
-          description: "List tasks as compact handles",
-          inputSchema: {
-            type: "object",
-            properties: {
-              filter: {
-                type: "object",
-                properties: {
-                  state: { type: "array", items: { type: "string", enum: ["inbox", "open", "done"] } },
-                  priority: { type: "array", items: { type: "string", enum: ["low", "med", "high"] } },
-                  q: { type: "string" }
-                }
-              },
-              limit: { type: "number", minimum: 1, maximum: 100 }
+              estimate_min: { type: ["number", "null"] },
+              due_ts: { type: ["string", "null"] },
+              source: { type: ["string", "null"] },
+              summary: { type: ["string", "null"] }
             }
           }
         },
-        {
-          name: "task.expand",
-          description: "Return full task",
-          inputSchema: {
+        required: ["id", "patch"]
+      }
+    },
+    {
+      name: "task.queryHybrid",
+      description: "Hybrid search combining keyword (FTS5) and semantic (Qdrant) search with weighted ranking",
+      inputSchema: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search query text" },
+          k: { type: "number", minimum: 1, maximum: 100, description: "Number of results to return (default: 10)" },
+          filters: {
             type: "object",
             properties: {
-              id: { type: "string" }
-            },
-            required: ["id"]
+              state: { type: "array", items: { type: "string", enum: ["inbox", "open", "done"] } },
+              priority: { type: "array", items: { type: "string", enum: ["low", "med", "high"] } }
+            }
           }
         },
-        {
-          name: "task.update",
-          description: "Patch fields on a task",
-          inputSchema: {
-            type: "object",
-            properties: {
-              id: { type: "string" },
-              patch: {
-                type: "object",
-                properties: {
-                  title: { type: "string" },
-                  body: { type: ["string", "null"] },
-                  state: { type: "string", enum: ["inbox", "open", "done"] },
-                  priority: { type: "string", enum: ["low", "med", "high"] },
-                  estimate_min: { type: ["number", "null"] },
-                  due_ts: { type: ["string", "null"] },
-                  source: { type: ["string", "null"] },
-                  summary: { type: ["string", "null"] }
-                }
-              }
-            },
-            required: ["id", "patch"]
-          }
-        },
-        {
-          name: "task.queryHybrid",
-          description: "Hybrid search combining keyword (FTS5) and semantic (Qdrant) search with weighted ranking",
-          inputSchema: {
-            type: "object",
-            properties: {
-              query: { type: "string", description: "Search query text" },
-              k: { type: "number", minimum: 1, maximum: 100, description: "Number of results to return (default: 10)" },
-              filters: {
-                type: "object",
-                properties: {
-                  state: { type: "array", items: { type: "string", enum: ["inbox", "open", "done"] } },
-                  priority: { type: "array", items: { type: "string", enum: ["low", "med", "high"] } }
-                }
-              }
-            },
-            required: ["query"]
-          }
-        }
-      ]
-    };
+        required: ["query"]
+      }
+    }
+  ];
+
+  // Convert helper tools to MCP tool format
+  const helperMcpTools = helperTools.map(tool => ({
+    name: tool.name,
+    description: tool.description,
+    inputSchema: tool.inputSchema
+  }));
+
+  // Combine core and helper tools
+  const allTools = [...coreTools, ...helperMcpTools];
+
+  // List available tools
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    return { tools: allTools };
   });
+
+  // Create a map of helper tool handlers
+  const helperHandlers = new Map<string, (args: any) => Promise<any> | any>();
+  for (const tool of helperTools) {
+    helperHandlers.set(tool.name, tool.handler);
+  }
 
   // Handle tool calls
   server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest) => {
     const { name, arguments: args } = request.params;
 
     try {
+      // Check if it's a helper tool
+      if (helperHandlers.has(name)) {
+        const handler = helperHandlers.get(name)!;
+        const result = await handler(args);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+
+      // Handle core task tools
       switch (name) {
         case "task.create": {
           const result = createTask(db, args as any);
@@ -170,8 +196,8 @@ export function buildServer(db: DB) {
   return server;
 }
 
-export async function startServer(db: DB) {
-  const server = buildServer(db);
+export async function startServer(db: DB, helperTools: ToolDefinition[] = []) {
+  const server = buildServer(db, helperTools);
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("[mcp-local-tasks] stdio server started");

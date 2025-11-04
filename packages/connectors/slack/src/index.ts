@@ -1,7 +1,7 @@
 import { App } from "@slack/bolt";
 import { BaseHelper } from "../../../server/dist/src/connections/base.js";
 import type { HelperContext, ToolDefinition } from "../../../server/dist/src/connections/types.js";
-import { upsertSlackMessage, getSlackMessagesByChannel, markMessageDeleted } from "./repo.js";
+import { upsertSlackMessage, getSlackMessagesByChannel, markMessageDeleted, getMessagesByDateRange, formatMessagesForSummary } from "./repo.js";
 import { PermalinkQueue } from "./permalink-queue.js";
 import type { Database } from "bun:sqlite";
 
@@ -9,6 +9,7 @@ interface SlackConfig {
   allow_channels?: string[];
   sweeper_minutes?: number;
   enable_todo_detection?: boolean;
+  enable_background_services?: boolean; // If false, only tools are available (no Socket Mode, sweeper, etc.)
 }
 
 class SlackHelper extends BaseHelper {
@@ -29,31 +30,43 @@ class SlackHelper extends BaseHelper {
     const appToken = process.env.SLACK_APP_TOKEN;
     const botToken = process.env.SLACK_BOT_TOKEN;
     
-    if (!appToken || !botToken) {
-      throw new Error("SLACK_APP_TOKEN and SLACK_BOT_TOKEN are required");
-    }
-
-    // Initialize Slack Bolt app with Socket Mode
-    this.app = new App({
-      token: botToken,
-      appToken,
-      socketMode: true,
-      signingSecret: process.env.SLACK_SIGNING_SECRET
-    });
-
-    // Initialize permalink hydration queue
-    this.permalinkQueue = new PermalinkQueue(
-      this.db,
-      this.app.client,
-      ctx.logger
-    );
-
-    this.setupMessageListeners();
+    // Only initialize Slack app if background services are enabled
+    const enableBackgroundServices = this.config.enable_background_services ?? false;
     
-    ctx.logger.info("slack.init", { 
-      config: this.config,
-      allowChannels: this.config.allow_channels?.length ?? 0
-    });
+    if (enableBackgroundServices) {
+      if (!appToken || !botToken) {
+        throw new Error("SLACK_APP_TOKEN and SLACK_BOT_TOKEN are required when enable_background_services is true");
+      }
+
+      // Initialize Slack Bolt app with Socket Mode
+      this.app = new App({
+        token: botToken,
+        appToken,
+        socketMode: true,
+        signingSecret: process.env.SLACK_SIGNING_SECRET
+      });
+
+      // Initialize permalink hydration queue
+      this.permalinkQueue = new PermalinkQueue(
+        this.db,
+        this.app.client,
+        ctx.logger
+      );
+
+      this.setupMessageListeners();
+      
+      ctx.logger.info("slack.init", { 
+        config: this.config,
+        allowChannels: this.config.allow_channels?.length ?? 0,
+        backgroundServices: true
+      });
+    } else {
+      ctx.logger.info("slack.init", { 
+        config: this.config,
+        backgroundServices: false,
+        note: "Only tools are available. Set enable_background_services: true for Socket Mode."
+      });
+    }
   }
 
   private setupMessageListeners() {
@@ -318,11 +331,77 @@ class SlackHelper extends BaseHelper {
             return { ok: false, error: error.message };
           }
         }
+      },
+      {
+        name: "slack.summarize_messages",
+        description: "Get Slack messages formatted for summarization. Returns messages in chronological order with timestamps and user info.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            channel_id: { 
+              type: "string",
+              description: "Optional channel ID to filter messages. If not provided, returns messages from all channels."
+            },
+            date_from: { 
+              type: "string",
+              description: "Optional start date in ISO 8601 format (e.g., '2025-01-01T00:00:00Z')"
+            },
+            date_to: { 
+              type: "string",
+              description: "Optional end date in ISO 8601 format (e.g., '2025-01-31T23:59:59Z')"
+            },
+            limit: { 
+              type: "number", 
+              minimum: 1, 
+              maximum: 500, 
+              default: 100,
+              description: "Maximum number of messages to retrieve (default: 100, max: 500)"
+            }
+          }
+        },
+        handler: async ({ channel_id, date_from, date_to, limit = 100 }: { 
+          channel_id?: string; 
+          date_from?: string; 
+          date_to?: string; 
+          limit?: number 
+        }) => {
+          try {
+            const messages = getMessagesByDateRange(this.db, {
+              channelId: channel_id,
+              dateFrom: date_from,
+              dateTo: date_to,
+              limit
+            });
+
+            const formatted = formatMessagesForSummary(messages);
+
+            return {
+              as_of: new Date().toISOString(),
+              source: "slack",
+              count: messages.length,
+              channel_id: channel_id ?? "all",
+              date_from: date_from ?? "all",
+              date_to: date_to ?? "all",
+              messages: formatted
+            };
+          } catch (error: any) {
+            return { error: error.message };
+          }
+        }
       }
     ];
   }
 
   async start() {
+    const enableBackgroundServices = this.config.enable_background_services ?? false;
+    
+    if (!enableBackgroundServices) {
+      this.ctx.logger.info("slack.start.skipped", { 
+        reason: "Background services disabled" 
+      });
+      return;
+    }
+
     this.ctx.logger.info("slack.start");
     
     // Start Slack Bolt app
@@ -354,6 +433,15 @@ class SlackHelper extends BaseHelper {
   }
 
   async stop() {
+    const enableBackgroundServices = this.config.enable_background_services ?? false;
+    
+    if (!enableBackgroundServices) {
+      this.ctx.logger.info("slack.stop.skipped", { 
+        reason: "Background services disabled" 
+      });
+      return;
+    }
+
     this.ctx.logger.info("slack.stop");
     
     // Stop sweeper

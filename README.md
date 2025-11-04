@@ -54,11 +54,18 @@ bun run init-qdrant
 
 The server exposes these tools via the MCP protocol:
 
+### Task Management
 - **`task.create`** - Create a new task with title, body, priority, due date
 - **`task.list`** - List tasks as compact handles with filtering and search
 - **`task.expand`** - Get full task details by ID
 - **`task.update`** - Update task fields (state, priority, etc.)
 - **`task.queryHybrid`** - Hybrid search combining keyword (FTS5) + semantic (Qdrant) search with weighted ranking
+
+### Slack Integration (via connector)
+- **`slack.list_channels`** - List available Slack channels
+- **`slack.get_history`** - Get message history from a channel
+- **`slack.post_message`** - Post messages to channels
+- **`slack.summarize_messages`** - Get messages formatted for AI summarization with date/channel filters
 
 ## 📦 Project Structure
 
@@ -85,19 +92,25 @@ config.json               # Helper configuration
 
 ## 🧩 Extensibility
 
-Add connection helpers by editing `config.json`:
+Add connection helpers by editing `config.json`. Helpers are automatically loaded by the MCP server and their tools are exposed via the MCP protocol:
 
 ```json
 {
   "helpers": [
     {
-      "name": "echo",
-      "module": "./packages/connectors/template/dist/src/index.js",
-      "config": { "greeting": "hi" }
+      "name": "slack",
+      "module": "./packages/connectors/slack/dist/index.js",
+      "config": {
+        "enable_background_services": false
+      }
     }
   ]
 }
 ```
+
+**Two modes:**
+- **MCP Mode** (`enable_background_services: false`): Tools only, no background services
+- **Daemon Mode** (`enable_background_services: true`): Full Socket Mode, sweeper, etc.
 
 See `docs/helpers.md` for the helper authoring guide.
 

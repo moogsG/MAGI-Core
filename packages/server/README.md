@@ -14,12 +14,20 @@ Local-first MCP server for managing development tasks with Model Context Protoco
 
 ## MCP Tools
 
+### Core Task Tools
 - `task.create` - Create a new task
 - `task.list` - List tasks as compact handles with filtering
 - `task.expand` - Get full task details
 - `task.update` - Update task fields
 - `task.queryHybrid` - Hybrid search combining keyword and semantic search
 - `task.export_markdown` - Export tasks to Markdown with grouping and AI prompts
+
+### Helper Tools (from connectors)
+Helper tools are automatically loaded from `config.json` and exposed via MCP:
+- `slack.list_channels` - List available Slack channels
+- `slack.get_history` - Get message history from a channel
+- `slack.post_message` - Post messages to channels
+- `slack.summarize_messages` - Get messages formatted for AI summarization
 
 See [EXPORT_MARKDOWN.md](../../docs/EXPORT_MARKDOWN.md) for detailed export documentation.
 
@@ -109,10 +117,26 @@ pnpm cli
 
 - `TASKS_DB_PATH` - Path to SQLite database (default: "tasks.db")
 
-### Slack Configuration
+### Helper Configuration
 
-If using the Slack daemon, configure `config.json` in the project root:
+Helpers are configured in `config.json` in the project root. The MCP server automatically loads helpers and exposes their tools.
 
+**MCP Mode (tools only, no background services):**
+```json
+{
+  "helpers": [
+    {
+      "name": "slack",
+      "module": "./packages/connectors/slack/dist/index.js",
+      "config": {
+        "enable_background_services": false
+      }
+    }
+  ]
+}
+```
+
+**Daemon Mode (with Socket Mode, sweeper, etc.):**
 ```json
 {
   "helpers": [
@@ -122,30 +146,32 @@ If using the Slack daemon, configure `config.json` in the project root:
       "config": {
         "allow_channels": ["#dev", "#ai"],
         "sweeper_minutes": 10,
-        "enable_todo_detection": true
+        "enable_todo_detection": true,
+        "enable_background_services": true
       }
     }
   ]
 }
 ```
 
-Also set environment variables:
+**Environment variables for Slack (required only if `enable_background_services: true`):**
 - `SLACK_APP_TOKEN` - Your Slack app token
 - `SLACK_BOT_TOKEN` - Your Slack bot token
 
 ## Architecture
 
 ### MCP Server (`src/index.ts`)
-- Pure task management server
+- Task management + helper tools via MCP protocol
 - Uses stdio transport for MCP protocol
-- No background services or timers
+- Automatically loads helpers from `config.json`
+- Helpers run in "tools-only" mode (no background services)
 - Clean process lifecycle with graceful shutdown
 
 ### Slack Daemon (`src/slack-daemon.ts`)
-- Separate process for Slack integration
-- Runs background jobs (message sweeping, permalink hydration)
-- Does not interfere with MCP stdio communication
-- Can run independently or alongside MCP server
+- Separate process for Slack background services
+- Runs Socket Mode, message sweeping, permalink hydration
+- Use this when you need real-time Slack message ingestion
+- Configure with `enable_background_services: true`
 
 ## Troubleshooting
 

@@ -180,3 +180,58 @@ export function getRecentMessages(
     };
   });
 }
+
+export function getMessagesByDateRange(
+  db: Database,
+  options: {
+    channelId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    limit?: number;
+  }
+): Array<{ id: string; channel_id: string; ts: string; user: string | null; text: string | null; created_ts: string }> {
+  const limit = options.limit ?? 100;
+  let sql = `
+    SELECT id, channel_id, ts, user, text, created_ts
+    FROM slack_messages
+    WHERE deleted = 0
+  `;
+  const params: any[] = [];
+
+  if (options.channelId) {
+    sql += ` AND channel_id = ?`;
+    params.push(options.channelId);
+  }
+
+  if (options.dateFrom) {
+    sql += ` AND created_ts >= ?`;
+    params.push(options.dateFrom);
+  }
+
+  if (options.dateTo) {
+    sql += ` AND created_ts <= ?`;
+    params.push(options.dateTo);
+  }
+
+  sql += ` ORDER BY created_ts DESC LIMIT ?`;
+  params.push(limit);
+
+  return db.query<any, any[]>(sql).all(...params);
+}
+
+export function formatMessagesForSummary(
+  messages: Array<{ channel_id: string; ts: string; user: string | null; text: string | null; created_ts: string }>
+): string {
+  if (messages.length === 0) {
+    return "No messages found.";
+  }
+
+  const formatted = messages.map((msg) => {
+    const timestamp = new Date(msg.created_ts).toLocaleString();
+    const user = msg.user ?? "unknown";
+    const text = msg.text ?? "[no text]";
+    return `[${timestamp}] ${user}: ${text}`;
+  }).join("\n\n");
+
+  return `Found ${messages.length} message(s):\n\n${formatted}`;
+}
