@@ -103,12 +103,22 @@ Add to `config.json`:
       "config": {
         "allow_channels": ["#dev", "#ai", "#support"],
         "sweeper_minutes": 10,
-        "enable_todo_detection": true
+        "enable_todo_detection": true,
+        "user": "U01234ABCDE"
       }
     }
   ]
 }
 ```
+
+**New: Priority Detection**
+
+Set `user` to your Slack user ID to enable priority detection:
+- Messages from you, mentioning you, or replying to your threads are marked as priority
+- TODO detection only creates tasks for messages from the configured user
+- MCP tools support `priority_only` filtering
+
+See [Slack Priority Feature](./SLACK_PRIORITY_FEATURE.md) for details.
 
 ### Allowlist Configuration
 

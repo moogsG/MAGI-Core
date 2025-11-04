@@ -8,6 +8,7 @@ export interface SlackMessage {
   edited_at: string | null;
   deleted: number;
   permalink: string | null;
+  priority: number;
   created_ts: string;
 }
 
@@ -17,6 +18,7 @@ export interface SlackMessageHandle {
   uid: string | null;
   preview: string;
   link: string | null;
+  priority: boolean;
   as_of: string;
   source: string;
   approx_freshness_seconds: number;

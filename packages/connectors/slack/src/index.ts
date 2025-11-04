@@ -10,6 +10,7 @@ interface SlackConfig {
   sweeper_minutes?: number;
   enable_todo_detection?: boolean;
   enable_background_services?: boolean; // If false, only tools are available (no Socket Mode, sweeper, etc.)
+  user?: string; // User ID for priority detection (messages mentioning/replying to this user get priority)
 }
 
 class SlackHelper extends BaseHelper {
@@ -69,6 +70,30 @@ class SlackHelper extends BaseHelper {
     }
   }
 
+  private isPriorityMessage(text: string | undefined, threadTs: string | undefined, userId: string | undefined): number {
+    const priorityUser = this.config.user;
+    if (!priorityUser) return 0;
+
+    // Check if message is from the priority user
+    if (userId === priorityUser) return 1;
+
+    // Check if message mentions the priority user
+    if (text && text.includes(`<@${priorityUser}>`)) return 1;
+
+    // Check if message is a reply to the priority user's thread
+    if (threadTs) {
+      const threadMessage = this.db
+        .query<{ user: string | null }, [string, string]>(
+          "SELECT user FROM slack_messages WHERE channel_id = ? AND ts = ?"
+        )
+        .get(threadTs.split('_')[0], threadTs.split('_')[1]);
+      
+      if (threadMessage?.user === priorityUser) return 1;
+    }
+
+    return 0;
+  }
+
   private setupMessageListeners() {
     // Listen to all message events
     this.app.event("message", async ({ event, logger }) => {
@@ -91,23 +116,27 @@ class SlackHelper extends BaseHelper {
         // Handle message changes
         if ("subtype" in event && event.subtype === "message_changed" && "message" in event) {
           const msg = event.message as any;
+          const priority = this.isPriorityMessage(msg.text, msg.thread_ts, msg.user);
+          
           upsertSlackMessage(this.db, {
             channel_id: event.channel,
             ts: msg.ts,
             user: msg.user,
             text: msg.text,
             thread_ts: msg.thread_ts,
-            edited_at: new Date().toISOString()
+            edited_at: new Date().toISOString(),
+            priority
           });
           
           this.ctx.logger.info("slack.message.updated", { 
             channel: event.channel, 
-            ts: msg.ts 
+            ts: msg.ts,
+            priority: priority === 1
           });
           
-          // Check for TODO if enabled
+          // Check for TODO if enabled - only for messages from priority user
           if (this.config.enable_todo_detection && msg.text?.includes("TODO:")) {
-            await this.createTodoTask(msg.text, event.channel, msg.ts);
+            await this.createTodoTask(msg.text, event.channel, msg.ts, msg.user);
           }
           
           return;
@@ -115,23 +144,29 @@ class SlackHelper extends BaseHelper {
 
         // Handle new messages
         if ("text" in event && "ts" in event) {
+          const userId = "user" in event ? event.user : undefined;
+          const threadTs = "thread_ts" in event ? event.thread_ts : undefined;
+          const priority = this.isPriorityMessage(event.text, threadTs, userId);
+          
           upsertSlackMessage(this.db, {
             channel_id: event.channel,
             ts: event.ts,
-            user: "user" in event ? event.user : undefined,
+            user: userId,
             text: event.text,
-            thread_ts: "thread_ts" in event ? event.thread_ts : undefined
+            thread_ts: threadTs,
+            priority
           });
 
           this.ctx.logger.info("slack.message.new", { 
             channel: event.channel, 
             ts: event.ts,
-            hasText: !!event.text
+            hasText: !!event.text,
+            priority: priority === 1
           });
 
-          // Check for TODO if enabled
+          // Check for TODO if enabled - only for messages from priority user
           if (this.config.enable_todo_detection && event.text?.includes("TODO:")) {
-            await this.createTodoTask(event.text, event.channel, event.ts);
+            await this.createTodoTask(event.text, event.channel, event.ts, userId);
           }
         }
       } catch (error) {
@@ -140,8 +175,21 @@ class SlackHelper extends BaseHelper {
     });
   }
 
-  private async createTodoTask(text: string, channelId: string, ts: string) {
+  private async createTodoTask(text: string, channelId: string, ts: string, userId?: string) {
     try {
+      // Only create tasks for messages from the configured user
+      const priorityUser = this.config.user;
+      if (priorityUser && userId !== priorityUser) {
+        this.ctx.logger.info("slack.todo.skipped", { 
+          channel: channelId, 
+          ts,
+          reason: "not-from-priority-user",
+          userId,
+          priorityUser
+        });
+        return;
+      }
+
       // Extract TODO text
       const todoMatch = text.match(/TODO:\s*(.+?)(?:\n|$)/i);
       if (!todoMatch) return;
@@ -166,7 +214,8 @@ class SlackHelper extends BaseHelper {
       this.ctx.logger.info("slack.todo.created", { 
         taskId, 
         channel: channelId, 
-        ts 
+        ts,
+        userId
       });
     } catch (error) {
       this.ctx.logger.error("slack.todo.error", { error });
@@ -205,12 +254,15 @@ class SlackHelper extends BaseHelper {
 
         if (history.messages) {
           for (const msg of history.messages) {
+            const priority = this.isPriorityMessage(msg.text, msg.thread_ts, msg.user);
+            
             upsertSlackMessage(this.db, {
               channel_id: channelId,
               ts: msg.ts!,
               user: msg.user,
               text: msg.text,
-              thread_ts: msg.thread_ts
+              thread_ts: msg.thread_ts,
+              priority
             });
           }
 
@@ -266,23 +318,25 @@ class SlackHelper extends BaseHelper {
       },
       {
         name: "slack.get_history",
-        description: "Get message history from a channel with compact handles",
+        description: "Get message history from a channel with compact handles. Supports filtering by priority (messages mentioning/replying to configured user).",
         inputSchema: {
           type: "object",
           properties: {
             channel_id: { type: "string" },
-            limit: { type: "number", minimum: 1, maximum: 200, default: 50 }
+            limit: { type: "number", minimum: 1, maximum: 200, default: 50 },
+            priority_only: { type: "boolean", default: false, description: "If true, only return priority messages" }
           },
           required: ["channel_id"]
         },
-        handler: async ({ channel_id, limit = 50 }: { channel_id: string; limit?: number }) => {
+        handler: async ({ channel_id, limit = 50, priority_only = false }: { channel_id: string; limit?: number; priority_only?: boolean }) => {
           try {
-            const messages = getSlackMessagesByChannel(this.db, channel_id, limit);
+            const messages = getSlackMessagesByChannel(this.db, channel_id, limit, priority_only);
             
             return {
               as_of: new Date().toISOString(),
               source: "slack",
               approx_freshness_seconds: messages[0]?.approx_freshness_seconds ?? 0,
+              priority_filter: priority_only,
               items: messages
             };
           } catch (error: any) {
@@ -334,7 +388,7 @@ class SlackHelper extends BaseHelper {
       },
       {
         name: "slack.summarize_messages",
-        description: "Get Slack messages formatted for summarization. Returns messages in chronological order with timestamps and user info.",
+        description: "Get Slack messages formatted for summarization. Returns messages in chronological order with timestamps and user info. Supports filtering by priority.",
         inputSchema: {
           type: "object",
           properties: {
@@ -356,21 +410,28 @@ class SlackHelper extends BaseHelper {
               maximum: 500, 
               default: 100,
               description: "Maximum number of messages to retrieve (default: 100, max: 500)"
+            },
+            priority_only: {
+              type: "boolean",
+              default: false,
+              description: "If true, only return priority messages (messages mentioning/replying to configured user)"
             }
           }
         },
-        handler: async ({ channel_id, date_from, date_to, limit = 100 }: { 
+        handler: async ({ channel_id, date_from, date_to, limit = 100, priority_only = false }: { 
           channel_id?: string; 
           date_from?: string; 
           date_to?: string; 
-          limit?: number 
+          limit?: number;
+          priority_only?: boolean;
         }) => {
           try {
             const messages = getMessagesByDateRange(this.db, {
               channelId: channel_id,
               dateFrom: date_from,
               dateTo: date_to,
-              limit
+              limit,
+              priorityOnly: priority_only
             });
 
             const formatted = formatMessagesForSummary(messages);
@@ -382,6 +443,7 @@ class SlackHelper extends BaseHelper {
               channel_id: channel_id ?? "all",
               date_from: date_from ?? "all",
               date_to: date_to ?? "all",
+              priority_filter: priority_only,
               messages: formatted
             };
           } catch (error: any) {

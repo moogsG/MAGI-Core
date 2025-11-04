@@ -34,6 +34,7 @@ export function upsertSlackMessage(
     edited_at?: string | null;
     deleted?: boolean;
     permalink?: string | null;
+    priority?: number;
   }
 ): void {
   const id = `${msg.channel_id}_${msg.ts}`;
@@ -47,7 +48,7 @@ export function upsertSlackMessage(
     // Update existing message
     db.query(`
       UPDATE slack_messages 
-      SET user = ?, text = ?, thread_ts = ?, edited_at = ?, deleted = ?, permalink = ?
+      SET user = ?, text = ?, thread_ts = ?, edited_at = ?, deleted = ?, permalink = ?, priority = ?
       WHERE id = ?
     `).run(
       msg.user ?? existing.user,
@@ -56,13 +57,14 @@ export function upsertSlackMessage(
       msg.edited_at ?? existing.edited_at,
       msg.deleted ? 1 : existing.deleted,
       msg.permalink ?? existing.permalink,
+      msg.priority ?? existing.priority,
       id
     );
   } else {
     // Insert new message
     db.query(`
-      INSERT INTO slack_messages (id, channel_id, ts, user, text, thread_ts, edited_at, deleted, permalink, created_ts)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO slack_messages (id, channel_id, ts, user, text, thread_ts, edited_at, deleted, permalink, priority, created_ts)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       msg.channel_id,
@@ -73,6 +75,7 @@ export function upsertSlackMessage(
       msg.edited_at ?? null,
       msg.deleted ? 1 : 0,
       msg.permalink ?? null,
+      msg.priority ?? 0,
       created_ts
     );
   }
@@ -81,15 +84,22 @@ export function upsertSlackMessage(
 export function getSlackMessagesByChannel(
   db: Database,
   channelId: string,
-  limit = 50
+  limit = 50,
+  priorityOnly = false
 ): SlackMessageHandle[] {
-  const rows = db.query<any, [string, number]>(`
-    SELECT id, ts, user, text, permalink, created_ts
+  let sql = `
+    SELECT id, ts, user, text, permalink, priority, created_ts
     FROM slack_messages
     WHERE channel_id = ? AND deleted = 0
-    ORDER BY ts DESC
-    LIMIT ?
-  `).all(channelId, limit);
+  `;
+  
+  if (priorityOnly) {
+    sql += ` AND priority = 1`;
+  }
+  
+  sql += ` ORDER BY priority DESC, ts DESC LIMIT ?`;
+  
+  const rows = db.query<any, [string, number]>(sql).all(channelId, limit);
 
   const asOf = nowISO();
   
@@ -104,6 +114,7 @@ export function getSlackMessagesByChannel(
       uid: row.user,
       preview: preview(row.text),
       link: row.permalink,
+      priority: row.priority === 1,
       as_of: asOf,
       source: "slack",
       approx_freshness_seconds: freshnessSeconds
@@ -151,15 +162,22 @@ export function markMessageDeleted(
 
 export function getRecentMessages(
   db: Database,
-  limit = 100
+  limit = 100,
+  priorityOnly = false
 ): SlackMessageHandle[] {
-  const rows = db.query<any, [number]>(`
-    SELECT id, ts, user, text, permalink, created_ts, channel_id
+  let sql = `
+    SELECT id, ts, user, text, permalink, priority, created_ts, channel_id
     FROM slack_messages
     WHERE deleted = 0
-    ORDER BY created_ts DESC
-    LIMIT ?
-  `).all(limit);
+  `;
+  
+  if (priorityOnly) {
+    sql += ` AND priority = 1`;
+  }
+  
+  sql += ` ORDER BY priority DESC, created_ts DESC LIMIT ?`;
+  
+  const rows = db.query<any, [number]>(sql).all(limit);
 
   const asOf = nowISO();
   
@@ -174,6 +192,7 @@ export function getRecentMessages(
       uid: row.user,
       preview: preview(row.text),
       link: row.permalink,
+      priority: row.priority === 1,
       as_of: asOf,
       source: "slack",
       approx_freshness_seconds: freshnessSeconds
@@ -188,11 +207,12 @@ export function getMessagesByDateRange(
     dateFrom?: string;
     dateTo?: string;
     limit?: number;
+    priorityOnly?: boolean;
   }
-): Array<{ id: string; channel_id: string; ts: string; user: string | null; text: string | null; created_ts: string }> {
+): Array<{ id: string; channel_id: string; ts: string; user: string | null; text: string | null; created_ts: string; priority: number }> {
   const limit = options.limit ?? 100;
   let sql = `
-    SELECT id, channel_id, ts, user, text, created_ts
+    SELECT id, channel_id, ts, user, text, created_ts, priority
     FROM slack_messages
     WHERE deleted = 0
   `;
@@ -213,7 +233,11 @@ export function getMessagesByDateRange(
     params.push(options.dateTo);
   }
 
-  sql += ` ORDER BY created_ts DESC LIMIT ?`;
+  if (options.priorityOnly) {
+    sql += ` AND priority = 1`;
+  }
+
+  sql += ` ORDER BY priority DESC, created_ts DESC LIMIT ?`;
   params.push(limit);
 
   return db.query<any, any[]>(sql).all(...params);
