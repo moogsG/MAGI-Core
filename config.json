@@ -9,7 +9,7 @@
       "name": "slack",
       "module": "./packages/connectors/slack/dist/index.js",
       "config": {
-        "allow_channels": ["#dev", "#ai", "#partner-support"],
+        "allow_channels": ["#partner-support"],
         "sweeper_minutes": 10,
         "enable_todo_detection": true
       }

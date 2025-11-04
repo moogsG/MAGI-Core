@@ -6,6 +6,11 @@
       "type": "local",
       "enabled": true,
       "command": ["npx", "-y", "mcp-remote", "https://mcp.getgrapevine.ai"]
+    },
+    "MAGIcore": {
+      "type": "local",
+      "enabled": true,
+      "command": ["bun", "x", "/Users/morgan.greff/workspace/MAGI-Core/packages/server/src/index.ts"]
     }
   }
 }

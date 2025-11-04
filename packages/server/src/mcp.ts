@@ -175,4 +175,5 @@ export async function startServer(db: DB) {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("[mcp-local-tasks] stdio server started");
+    await new Promise(() => {});
 }

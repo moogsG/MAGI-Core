@@ -1,4 +1,3 @@
-import "dotenv/config";
 import { openDB } from "./db/index.js";
 import { startServer } from "./mcp.js";
 import { HelperRegistry } from "./connections/registry.js";
