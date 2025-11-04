@@ -4,6 +4,15 @@
       "name": "echo",
       "module": "./packages/connectors/template/dist/src/index.js",
       "config": { "greeting": "hi" }
+    },
+    {
+      "name": "slack",
+      "module": "./packages/connectors/slack/dist/src/index.js",
+      "config": {
+        "allow_channels": ["#dev", "#ai", "#support"],
+        "sweeper_minutes": 10,
+        "enable_todo_detection": true
+      }
     }
   ]
 }
