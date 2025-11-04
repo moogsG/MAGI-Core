@@ -23,9 +23,7 @@ export function createTask(db: DB, input: {
     updated_ts: ts
   });
 
-  // keep FTS in sync (optional)
-  db.prepare(`INSERT INTO tasks_fts(rowid, title, body, summary)
-              SELECT rowid, title, body, summary FROM tasks WHERE id = ?`).run(id);
+  // FTS is kept in sync automatically via triggers
 
   return { id, t: input.title, s: "inbox" };
 }
@@ -100,10 +98,7 @@ export function updateTask(db: DB, id: string, patch: Partial<Omit<Task, "id" | 
     updated_ts: merged.updated_ts
   });
 
-  // refresh FTS row
-  db.prepare(`DELETE FROM tasks_fts WHERE rowid = (SELECT rowid FROM tasks WHERE id = ?)`).run(id);
-  db.prepare(`INSERT INTO tasks_fts(rowid, title, body, summary)
-              SELECT rowid, title, body, summary FROM tasks WHERE id = ?`).run(id);
+  // FTS is refreshed automatically via triggers
 
   return { ok: true as const };
 }
