@@ -10,7 +10,7 @@
     "MAGIcore": {
       "type": "local",
       "enabled": true,
-      "command": ["bun", "x", "/Users/morgan.greff/workspace/MAGI-Core/packages/server/src/index.ts"]
+      "command": ["bun", "run", "/Users/morgan.greff/workspace/MAGI-Core/packages/server/src/index.ts"]
     }
   }
 }

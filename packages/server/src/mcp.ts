@@ -175,5 +175,8 @@ export async function startServer(db: DB) {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("[mcp-local-tasks] stdio server started");
-    await new Promise(() => {});
+  
+  // Keep process alive - the transport handles all stdio communication
+  // This promise never resolves, keeping the event loop active
+  await new Promise(() => {});
 }
