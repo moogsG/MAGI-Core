@@ -88,7 +88,7 @@ Current test coverage:
 
 - [Project Plan](docs/PROJECT_PLAN.md) - Full specification and architecture
 - [Helper Guide](docs/helpers.md) - How to write connection helpers
-- [Implementation Summary](IMPLEMENTATION_SUMMARY.md) - What's been built
+- [Implementation Summary](docs/IMPLEMENTATION_SUMMARY.md) - What's been built
 - [Server Package](packages/server/README.md) - Server details
 - [Connector Template](packages/connectors/template/README.md) - Example helper
 

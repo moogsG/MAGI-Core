@@ -9,18 +9,18 @@ export function createTask(db: DB, input: {
 }): { id: string; t: string; s: TaskState } {
   const id = "t_" + randomUUID().slice(0, 8);
   const ts = nowISO();
-  db.prepare(`
+  db.query(`
     INSERT INTO tasks(id, title, body, state, priority, due_ts, source, created_ts, updated_ts)
-    VALUES (@id, @title, @body, 'inbox', @priority, @due_ts, @source, @created_ts, @updated_ts)
+    VALUES ($id, $title, $body, 'inbox', $priority, $due_ts, $source, $created_ts, $updated_ts)
   `).run({
-    id,
-    title: input.title,
-    body: input.body ?? null,
-    priority: input.priority ?? "med",
-    due_ts: input.due_ts ?? null,
-    source: input.source ?? "local",
-    created_ts: ts,
-    updated_ts: ts
+    $id: id,
+    $title: input.title,
+    $body: input.body ?? null,
+    $priority: input.priority ?? "med",
+    $due_ts: input.due_ts ?? null,
+    $source: input.source ?? "local",
+    $created_ts: ts,
+    $updated_ts: ts
   });
 
   // FTS is kept in sync automatically via triggers
@@ -34,7 +34,7 @@ export function listTaskHandles(db: DB, params: {
   const limit = params.limit ?? 20;
 
   if (params.q && params.q.trim().length > 0) {
-    const rows = db.prepare(`
+    const rows = db.query(`
       SELECT t.id, t.title AS t,
              substr(coalesce(t.summary, t.body, ''), 1, 300) AS p,
              t.state AS s, t.due_ts AS d
@@ -64,12 +64,12 @@ export function listTaskHandles(db: DB, params: {
   sql += ` ORDER BY created_ts DESC LIMIT ?`;
   bind.push(limit);
 
-  const rows = db.prepare(sql).all(...bind);
+  const rows = db.query(sql).all(...bind);
   return rows as TaskHandle[];
 }
 
 export function expandTask(db: DB, id: string): Task | null {
-  const row = db.prepare(`SELECT * FROM tasks WHERE id = ?`).get(id) as Task | undefined;
+  const row = db.query(`SELECT * FROM tasks WHERE id = ?`).get(id) as Task | undefined;
   return row ?? null;
 }
 
@@ -79,23 +79,23 @@ export function updateTask(db: DB, id: string, patch: Partial<Omit<Task, "id" | 
 
   const merged = { ...existing, ...patch, updated_ts: nowISO() };
 
-  db.prepare(`
+  db.query(`
     UPDATE tasks SET
-      title=@title, body=@body, state=@state, priority=@priority,
-      estimate_min=@estimate_min, due_ts=@due_ts, source=@source,
-      summary=@summary, updated_ts=@updated_ts
-    WHERE id=@id
+      title=$title, body=$body, state=$state, priority=$priority,
+      estimate_min=$estimate_min, due_ts=$due_ts, source=$source,
+      summary=$summary, updated_ts=$updated_ts
+    WHERE id=$id
   `).run({
-    id,
-    title: merged.title,
-    body: merged.body ?? null,
-    state: merged.state,
-    priority: merged.priority,
-    estimate_min: merged.estimate_min ?? null,
-    due_ts: merged.due_ts ?? null,
-    source: merged.source ?? "local",
-    summary: merged.summary ?? null,
-    updated_ts: merged.updated_ts
+    $id: id,
+    $title: merged.title,
+    $body: merged.body ?? null,
+    $state: merged.state,
+    $priority: merged.priority,
+    $estimate_min: merged.estimate_min ?? null,
+    $due_ts: merged.due_ts ?? null,
+    $source: merged.source ?? "local",
+    $summary: merged.summary ?? null,
+    $updated_ts: merged.updated_ts
   });
 
   // FTS is refreshed automatically via triggers
