@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": ".",
+    "declaration": true,
+    "types": ["node", "bun-types"]
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

@@ -7,6 +7,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { DB } from "./db/index.js";
 import { createTask, expandTask, listTaskHandles, updateTask } from "./tasks/repo.js";
+import { queryHybrid } from "./tasks/hybrid.js";
 
 export function buildServer(db: DB) {
   const server = new Server(
@@ -85,6 +86,25 @@ export function buildServer(db: DB) {
             },
             required: ["id", "patch"]
           }
+        },
+        {
+          name: "task.queryHybrid",
+          description: "Hybrid search combining keyword (FTS5) and semantic (Qdrant) search with weighted ranking",
+          inputSchema: {
+            type: "object",
+            properties: {
+              query: { type: "string", description: "Search query text" },
+              k: { type: "number", minimum: 1, maximum: 100, description: "Number of results to return (default: 10)" },
+              filters: {
+                type: "object",
+                properties: {
+                  state: { type: "array", items: { type: "string", enum: ["inbox", "open", "done"] } },
+                  priority: { type: "array", items: { type: "string", enum: ["low", "med", "high"] } }
+                }
+              }
+            },
+            required: ["query"]
+          }
         }
       ]
     };
@@ -122,6 +142,19 @@ export function buildServer(db: DB) {
         case "task.update": {
           const { id, patch } = args as any;
           const result = updateTask(db, id, patch);
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        }
+
+        case "task.queryHybrid": {
+          const { query, k, filters } = args as any;
+          const items = await queryHybrid(db, query, k ?? 10, filters);
+          const result = { 
+            as_of: new Date().toISOString(), 
+            source: "hybrid", 
+            query,
+            items, 
+            count: items.length 
+          };
           return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
         }
 

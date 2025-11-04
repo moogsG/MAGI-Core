@@ -9,6 +9,8 @@
     "dev": "bun src/index.ts",
     "test": "bun test test/*.test.ts",
     "seed": "bun src/db/seed.ts",
+    "seed:hybrid": "bun src/db/seed-hybrid.ts",
+    "test:hybrid": "bun src/db/test-hybrid.ts",
     "benchmark": "bun src/db/benchmark.ts",
     "cli": "bun src/cli.ts",
     "lint": "echo 'lint placeholder'",
