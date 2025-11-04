@@ -147,6 +147,9 @@ vite.config.ts.timestamp-*
 *.db-shm
 *.db-wal
 
+# Qdrant vector database storage
+data/qdrant_storage/
+
 # TypeScript build output (keep source, ignore compiled)
 packages/*/dist/
 packages/connectors/*/dist/
