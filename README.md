@@ -125,7 +125,7 @@ Current test coverage:
 ## 📚 Documentation
 
 - [Project Plan](docs/PROJECT_PLAN.md) - Full specification and architecture
-- [Hybrid Search Guide](HYBRID_SEARCH_GUIDE.md) - Setup and usage guide
+- [Hybrid Search Guide](docs/HYBRID_SEARCH_GUIDE.md) - Setup and usage guide
 - [Helper Guide](docs/helpers.md) - How to write connection helpers
 - [Implementation Summary](docs/IMPLEMENTATION_SUMMARY.md) - What's been built
 - [Data Package](packages/data/IMPLEMENTATION.md) - Analytics & vector search
