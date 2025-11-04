@@ -3,18 +3,12 @@
     {
       "name": "echo",
       "module": "./packages/connectors/template/dist/src/index.js",
-      "config": { "greeting": "hi" }
+      "config": {}
     },
     {
       "name": "slack",
       "module": "./packages/connectors/slack/dist/index.js",
-      "config": {
-        "allow_channels": ["#partner-support", "#team-hardcore-developer-chat"],
-        "user": "D027S9W5WGP",
-        "sweeper_minutes": 10,
-        "enable_todo_detection": true,
-        "enable_background_services": true
-      }
+      "config": {}
     }
   ]
 }

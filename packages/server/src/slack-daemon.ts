@@ -1,6 +1,7 @@
 import { openDB } from "./db/index.js";
 import { HelperRegistry } from "./connections/registry.js";
 import { loadHelpersFromConfig } from "./connections/loader.js";
+import { mergeConfigWithEnv } from "./connections/config-loader.js";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -17,7 +18,9 @@ try {
   const configPath = path.join(process.cwd(), "config.json");
   if (fs.existsSync(configPath)) {
     const configContent = fs.readFileSync(configPath, "utf8");
-    config = JSON.parse(configContent);
+    const baseConfig = JSON.parse(configContent);
+    // Merge environment variables into config
+    config = mergeConfigWithEnv(baseConfig);
   }
 } catch (error) {
   logger.warn("Could not load config.json", { 

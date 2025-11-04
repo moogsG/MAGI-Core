@@ -38,6 +38,23 @@ NODE_ENV=development
 QDRANT_ENABLED=false
 ```
 
+**For Slack integration**, add these to `.env`:
+
+```bash
+# Slack tokens (get from https://api.slack.com/apps)
+SLACK_APP_TOKEN=xapp-1-...
+SLACK_BOT_TOKEN=xoxb-...
+
+# Slack configuration
+SLACK_ALLOWED_CHANNELS=#dev,#ai,#support
+SLACK_USER_ID=U123456789
+SLACK_SWEEPER_MINUTES=10
+SLACK_ENABLE_TODO_DETECTION=true
+SLACK_ENABLE_BACKGROUND_SERVICES=true
+```
+
+**Note:** All connector configuration is done via environment variables. The `config.json` file only defines which connectors to load.
+
 See [Configuration Guide](./config.md) for all options.
 
 ### 3. Build

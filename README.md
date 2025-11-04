@@ -18,6 +18,10 @@ A fast, private, token-lean task management system that runs locally and integra
 # Install dependencies
 bun install
 
+# Copy sample environment file and configure
+cp sample.env .env
+# Edit .env with your settings (Slack tokens, channels, etc.)
+
 # Build all packages
 bun run build
 
@@ -92,7 +96,21 @@ config.json               # Helper configuration
 
 ## 🧩 Extensibility
 
-Add connection helpers by editing `config.json`. Helpers are automatically loaded by the MCP server and their tools are exposed via the MCP protocol:
+### Configuration System
+
+MAGI-Core uses a two-file configuration system:
+
+1. **`config.json`** - Defines which helpers to load and their module paths
+2. **`.env`** - Contains all configuration values (secrets, channels, settings)
+
+Environment variables **always override** values in `config.json`, making it easy to:
+- Keep secrets out of version control
+- Use different settings per environment
+- Share base configuration while customizing per deployment
+
+### Adding Connectors
+
+Edit `config.json` to define which helpers to load:
 
 ```json
 {
@@ -100,19 +118,30 @@ Add connection helpers by editing `config.json`. Helpers are automatically loade
     {
       "name": "slack",
       "module": "./packages/connectors/slack/dist/index.js",
-      "config": {
-        "enable_background_services": false
-      }
+      "config": {}
     }
   ]
 }
 ```
 
-**Two modes:**
-- **MCP Mode** (`enable_background_services: false`): Tools only, no background services
-- **Daemon Mode** (`enable_background_services: true`): Full Socket Mode, sweeper, etc.
+Then configure the helper in `.env`:
 
-See `docs/helpers.md` for the helper authoring guide.
+```bash
+# Slack Configuration
+SLACK_APP_TOKEN=xapp-...
+SLACK_BOT_TOKEN=xoxb-...
+SLACK_ALLOWED_CHANNELS=#dev,#ai,#support
+SLACK_USER_ID=U123456789
+SLACK_SWEEPER_MINUTES=10
+SLACK_ENABLE_TODO_DETECTION=true
+SLACK_ENABLE_BACKGROUND_SERVICES=true
+```
+
+**Two modes:**
+- **MCP Mode** (`SLACK_ENABLE_BACKGROUND_SERVICES=false`): Tools only, no background services
+- **Daemon Mode** (`SLACK_ENABLE_BACKGROUND_SERVICES=true`): Full Socket Mode, sweeper, etc.
+
+See `docs/helpers.md` for the helper authoring guide and `docs/config.md` for complete configuration reference.
 
 ## 🧪 Testing
 

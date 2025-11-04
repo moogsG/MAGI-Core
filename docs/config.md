@@ -6,8 +6,13 @@ Complete reference for MAGI-Core environment variables and configuration files.
 
 MAGI-Core uses two configuration files:
 
-1. **`.env`** - Environment variables (secrets, paths, settings)
-2. **`config.json`** - Helper/connector configuration (non-secret)
+1. **`.env`** - Environment variables (secrets, paths, settings) - **Primary configuration source**
+2. **`config.json`** - Helper/connector module definitions
+
+**Important:** Environment variables in `.env` **always override** values in `config.json`. This allows you to:
+- Keep secrets and sensitive data out of version control
+- Use different configurations per environment (dev, staging, prod)
+- Share a base `config.json` while customizing settings via `.env`
 
 ## Environment Variables
 
@@ -278,9 +283,23 @@ Comma-separated list of allowed channels.
 - **Type:** String (comma-separated)
 - **Format:** `#channel-name` or `C0123456789`
 - **Example:** `#dev,#ai,#support`
+- **Note:** Overrides `allow_channels` in `config.json`
 
 ```bash
 SLACK_ALLOWED_CHANNELS=#dev,#ai,#support
+```
+
+#### SLACK_USER_ID
+
+User ID for priority detection. Messages mentioning or replying to this user get priority.
+
+- **Type:** String
+- **Format:** Slack user ID (e.g., `U028WN16C2C`)
+- **Example:** `U123456789`
+- **Note:** Overrides `user` in `config.json`
+
+```bash
+SLACK_USER_ID=U028WN16C2C
 ```
 
 #### SLACK_SWEEPER_MINUTES
@@ -290,9 +309,36 @@ Background sweep interval for channels (minutes).
 - **Type:** Number
 - **Default:** `10`
 - **Range:** `5` - `60`
+- **Note:** Overrides `sweeper_minutes` in `config.json`
 
 ```bash
 SLACK_SWEEPER_MINUTES=10
+```
+
+#### SLACK_ENABLE_TODO_DETECTION
+
+Enable automatic task creation from TODO: messages.
+
+- **Type:** Boolean
+- **Values:** `true`, `false`
+- **Default:** `false`
+- **Note:** Overrides `enable_todo_detection` in `config.json`
+
+```bash
+SLACK_ENABLE_TODO_DETECTION=true
+```
+
+#### SLACK_ENABLE_BACKGROUND_SERVICES
+
+Enable background services (Socket Mode, sweeper, etc.). Set to `false` for MCP-only mode.
+
+- **Type:** Boolean
+- **Values:** `true`, `false`
+- **Default:** `false`
+- **Note:** Overrides `enable_background_services` in `config.json`
+
+```bash
+SLACK_ENABLE_BACKGROUND_SERVICES=true
 ```
 
 ### Microsoft 365 Connector Settings
@@ -393,6 +439,21 @@ OpenAI API key for embeddings.
 OPENAI_API_KEY=sk-proj-abc123...
 ```
 
+### Connector Configuration Settings
+
+#### ECHO_GREETING
+
+Greeting message for the Echo/Template connector.
+
+- **Type:** String
+- **Default:** `hi`
+- **Example:** `Hello from MAGI-Core!`
+- **Note:** Overrides `greeting` in `config.json`
+
+```bash
+ECHO_GREETING=Hello from MAGI-Core!
+```
+
 ### Developer / Diagnostics Settings
 
 #### DEBUG_MCP
@@ -444,7 +505,9 @@ TMP_PATH=./tmp
 
 ## config.json Format
 
-The `config.json` file configures connection helpers (connectors).
+The `config.json` file defines which connection helpers (connectors) to load and where to find them.
+
+**Important:** Configuration values should be set in `.env`, not in `config.json`. The `config` object in `config.json` is optional and serves as fallback defaults only.
 
 ### Structure
 
@@ -480,13 +543,59 @@ Path to the helper module (relative or absolute).
 
 #### config
 
-Helper-specific configuration object.
+Helper-specific configuration object (optional fallback defaults).
 
 - **Type:** Object
 - **Required:** No
 - **Default:** `{}`
+- **Note:** Values in `.env` will override these defaults
 
 ### Example Configuration
+
+**Recommended approach** (config.json with empty config, settings in .env):
+
+```json
+{
+  "helpers": [
+    {
+      "name": "slack",
+      "module": "./packages/connectors/slack/dist/index.js",
+      "config": {}
+    },
+    {
+      "name": "outlook",
+      "module": "./packages/connectors/ms/dist/index.js",
+      "config": {}
+    },
+    {
+      "name": "echo",
+      "module": "./packages/connectors/template/dist/src/index.js",
+      "config": {}
+    }
+  ]
+}
+```
+
+Then configure in `.env`:
+
+```bash
+# Slack
+SLACK_ALLOWED_CHANNELS=#dev,#ai,#support
+SLACK_USER_ID=U123456789
+SLACK_SWEEPER_MINUTES=10
+SLACK_ENABLE_TODO_DETECTION=true
+SLACK_ENABLE_BACKGROUND_SERVICES=true
+
+# Microsoft 365
+MS_CLIENT_ID=...
+MS_POLL_MINUTES=5
+MS_MAIL_FOLDERS=Inbox,Important
+
+# Echo
+ECHO_GREETING=Hello from MAGI-Core!
+```
+
+**Alternative approach** (with fallback defaults in config.json):
 
 ```json
 {
@@ -495,91 +604,94 @@ Helper-specific configuration object.
       "name": "slack",
       "module": "./packages/connectors/slack/dist/index.js",
       "config": {
-        "allow_channels": ["#dev", "#ai", "#support"],
+        "allow_channels": ["#dev"],
         "sweeper_minutes": 10,
-        "enable_todo_detection": true
-      }
-    },
-    {
-      "name": "outlook",
-      "module": "./packages/connectors/ms/dist/index.js",
-      "config": {
-        "poll_minutes": 5,
-        "mail_folders": ["Inbox", "Important"]
-      }
-    },
-    {
-      "name": "echo",
-      "module": "./packages/connectors/template/dist/src/index.js",
-      "config": {
-        "greeting": "Hello from MAGI-Core!"
+        "enable_todo_detection": false
       }
     }
   ]
 }
 ```
 
+Environment variables will override these defaults.
+
 ## Connector-Specific Configuration
 
 ### Slack Connector
 
+**config.json:**
 ```json
 {
   "name": "slack",
   "module": "./packages/connectors/slack/dist/index.js",
-  "config": {
-    "allow_channels": ["#dev", "#ai"],
-    "sweeper_minutes": 10,
-    "enable_todo_detection": true
-  }
+  "config": {}
 }
 ```
 
-**Options:**
+**Environment Variables:**
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `allow_channels` | string[] | `[]` | Allowed channels (names or IDs) |
-| `sweeper_minutes` | number | `10` | Background sweep interval (5-60) |
-| `enable_todo_detection` | boolean | `false` | Auto-create tasks from TODO: messages |
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `SLACK_ALLOWED_CHANNELS` | string (comma-separated) | `""` | Allowed channels (names or IDs) |
+| `SLACK_USER_ID` | string | `""` | User ID for priority detection |
+| `SLACK_SWEEPER_MINUTES` | number | `10` | Background sweep interval (5-60) |
+| `SLACK_ENABLE_TODO_DETECTION` | boolean | `false` | Auto-create tasks from TODO: messages |
+| `SLACK_ENABLE_BACKGROUND_SERVICES` | boolean | `false` | Enable Socket Mode and background services |
+
+**Example .env:**
+```bash
+SLACK_ALLOWED_CHANNELS=#dev,#ai
+SLACK_USER_ID=U123456789
+SLACK_SWEEPER_MINUTES=10
+SLACK_ENABLE_TODO_DETECTION=true
+SLACK_ENABLE_BACKGROUND_SERVICES=true
+```
 
 ### Microsoft 365 Connector
 
+**config.json:**
 ```json
 {
   "name": "outlook",
   "module": "./packages/connectors/ms/dist/index.js",
-  "config": {
-    "poll_minutes": 5,
-    "mail_folders": ["Inbox", "Important"]
-  }
+  "config": {}
 }
 ```
 
-**Options:**
+**Environment Variables:**
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `poll_minutes` | number | `5` | Polling interval (2-60) |
-| `mail_folders` | string[] | `["Inbox"]` | Mail folders to sync |
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `MS_POLL_MINUTES` | number | `5` | Polling interval (2-60) |
+| `MS_MAIL_FOLDERS` | string (comma-separated) | `"Inbox"` | Mail folders to sync |
+
+**Example .env:**
+```bash
+MS_POLL_MINUTES=5
+MS_MAIL_FOLDERS=Inbox,Important
+```
 
 ### Template Connector
 
+**config.json:**
 ```json
 {
   "name": "echo",
   "module": "./packages/connectors/template/dist/src/index.js",
-  "config": {
-    "greeting": "Hello!"
-  }
+  "config": {}
 }
 ```
 
-**Options:**
+**Environment Variables:**
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `greeting` | string | `"hi"` | Greeting message |
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `ECHO_GREETING` | string | `"hi"` | Greeting message |
+
+**Example .env:**
+```bash
+ECHO_GREETING=Hello from MAGI-Core!
+```
 
 ## Configuration Profiles
 
@@ -675,28 +787,42 @@ MS_POLL_MINUTES=5
 MS_MAIL_FOLDERS=Inbox,Important
 ```
 
-## Environment Variable Precedence
+## Configuration Precedence
 
-MAGI-Core loads environment variables in this order (later overrides earlier):
+MAGI-Core loads configuration in this order (later overrides earlier):
 
-1. **System environment** (shell exports)
-2. **`.env` file** (in project root)
-3. **Command-line overrides** (inline variables)
+1. **`config.json`** - Base configuration with helper definitions and optional defaults
+2. **System environment** (shell exports)
+3. **`.env` file** (in project root) - Bun auto-loads this
+4. **Command-line overrides** (inline variables)
 
 Example:
 
-```bash
-# System export
-export TASKS_DB_PATH=/system/tasks.db
-
-# .env file
-TASKS_DB_PATH=./data/tasks.db
-
-# Command-line override
-TASKS_DB_PATH=/tmp/tasks.db bun run dev
+```json
+// config.json
+{
+  "helpers": [{
+    "name": "slack",
+    "module": "./packages/connectors/slack/dist/index.js",
+    "config": { "sweeper_minutes": 10 }
+  }]
+}
 ```
 
-Final value: `/tmp/tasks.db`
+```bash
+# System export
+export SLACK_SWEEPER_MINUTES=15
+
+# .env file
+SLACK_SWEEPER_MINUTES=20
+
+# Command-line override
+SLACK_SWEEPER_MINUTES=30 bun run dev
+```
+
+Final value: `30` (command-line wins)
+
+**Best Practice:** Keep `config.json` minimal (just helper names and modules) and put all configuration in `.env`.
 
 ## Validation
 

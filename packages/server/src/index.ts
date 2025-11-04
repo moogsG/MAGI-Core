@@ -2,6 +2,7 @@ import { openDB } from "./db/index.js";
 import { startServer } from "./mcp.js";
 import { HelperRegistry } from "./connections/registry.js";
 import { loadHelpersFromConfig } from "./connections/loader.js";
+import { mergeConfigWithEnv } from "./connections/config-loader.js";
 import fs from "node:fs";
 import path from "node:path";
 import type { ToolDefinition } from "./connections/types.js";
@@ -19,8 +20,10 @@ try {
   const configPath = path.join(process.cwd(), "config.json");
   if (fs.existsSync(configPath)) {
     const configContent = fs.readFileSync(configPath, "utf8");
-    config = JSON.parse(configContent);
-    logger.info("Loaded config.json", { helpers: config.helpers?.length ?? 0 });
+    const baseConfig = JSON.parse(configContent);
+    // Merge environment variables into config
+    config = mergeConfigWithEnv(baseConfig);
+    logger.info("Loaded config.json with env overrides", { helpers: config.helpers?.length ?? 0 });
   }
 } catch (error) {
   logger.warn("Could not load config.json", { 
