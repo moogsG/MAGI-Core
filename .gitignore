@@ -140,7 +140,20 @@ vite.config.ts.timestamp-*
 
 .opencode
 .idea-e 
+.idea/
+
 # SQLite database files
 *.db
 *.db-shm
 *.db-wal
+
+# TypeScript build output (keep source, ignore compiled)
+packages/*/dist/
+packages/connectors/*/dist/
+# Ignore compiled JS/declaration files in src directories (should be in dist/)
+packages/**/src/**/*.js
+packages/**/src/**/*.d.ts
+!packages/**/src/**/*.test.js
+
+# Test files (temporary/local only)
+**/test-live.ts
