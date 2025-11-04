@@ -1,0 +1,9 @@
+{
+  "helpers": [
+    {
+      "name": "echo",
+      "module": "./packages/connectors/template/dist/src/index.js",
+      "config": { "greeting": "hi" }
+    }
+  ]
+}

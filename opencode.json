@@ -1,0 +1,11 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "theme": "tokyonight",
+  "mcp": {
+    "grapevine": {
+      "type": "local",
+      "enabled": true,
+      "command": ["npx", "-y", "mcp-remote", "https://mcp.getgrapevine.ai"]
+    }
+  }
+}
